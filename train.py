@@ -96,7 +96,7 @@ if __name__ == "__main__":
 
     # --- Config ---
     CSV_PATH = "processed_dataset_cropped_full.csv"
-    BATCH_SIZE = 8
+    BATCH_SIZE = 16
     NUM_EPOCHS = 25
     LR = 1e-4
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -138,8 +138,8 @@ if __name__ == "__main__":
     val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=1, pin_memory=True)
 
     # --- Model setup ---
-    sky_encoder = ImageEncoder(model_name="swin_tiny_patch4_window7_224", pretrained=True, freeze=True)
-    flow_encoder = ImageEncoder(model_name="resnet18", pretrained=True, freeze=True)
+    sky_encoder = ImageEncoder(model_name="swin_tiny_patch4_window7_224", pretrained=True, freeze=False)
+    flow_encoder = ImageEncoder(model_name="resnet18", pretrained=True, freeze=False)
     model = MultimodalForecaster(
         sky_encoder=sky_encoder,
         flow_encoder=flow_encoder,
