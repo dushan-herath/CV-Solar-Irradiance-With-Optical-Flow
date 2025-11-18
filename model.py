@@ -83,6 +83,26 @@ class GatedFusion(nn.Module):
         return self.dropout(fused)
 
 
+
+class ConcatFusion(nn.Module):
+    def __init__(self, img_dim, ts_dim, fused_dim, dropout=0.1):
+        super().__init__()
+        self.proj = nn.Sequential(
+            nn.Linear(img_dim + ts_dim, fused_dim),
+            nn.GELU(),
+            nn.LayerNorm(fused_dim),
+            nn.Dropout(dropout)
+        )
+
+    def forward(self, img_feats, ts_feats):
+        # Align TS length to image length
+        ts_last = ts_feats[:, -img_feats.shape[1]:, :]
+
+        fused = torch.cat([img_feats, ts_last], dim=-1)
+        return self.proj(fused)
+
+
+
 # =========================================
 # TEMPORAL TRANSFORMER
 # =========================================
@@ -144,7 +164,9 @@ class MultimodalForecaster(nn.Module):
         self.ts_pos_enc = PositionalEncoding(ts_embed_dim)
 
         # Fusion: fuse sky + flow + ts
-        self.fusion = GatedFusion(img_dim=self.sky_img_dim + self.flow_img_dim, ts_dim=ts_embed_dim, fused_dim=fused_dim)
+        #self.fusion = GatedFusion(img_dim=self.sky_img_dim + self.flow_img_dim, ts_dim=ts_embed_dim, fused_dim=fused_dim)
+
+        self.fusion = ConcatFusion( img_dim=self.sky_img_dim + self.flow_img_dim, ts_dim=ts_embed_dim, fused_dim=fused_dim, dropout=dropout)
 
         # Temporal modeling
         self.temporal = FusionTransformer(
