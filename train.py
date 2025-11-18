@@ -95,7 +95,7 @@ if __name__ == "__main__":
     mp.freeze_support()  
 
     # --- Config ---
-    CSV_PATH = "processed_dataset_cropped_sanity.csv"
+    CSV_PATH = "processed_dataset_cropped_full.csv"
     BATCH_SIZE = 8
     NUM_EPOCHS = 25
     LR = 1e-4

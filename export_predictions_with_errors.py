@@ -54,7 +54,7 @@ if __name__ == "__main__":
     mp.freeze_support()
 
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    CSV_PATH = "processed_dataset_cropped_sanity.csv"
+    CSV_PATH = "processed_dataset_cropped_full.csv"
     IMG_SEQ_LEN = 5
     TS_SEQ_LEN = 30
     MAX_HORIZON = 25
