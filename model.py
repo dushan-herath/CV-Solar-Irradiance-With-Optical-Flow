@@ -166,7 +166,9 @@ class MultimodalForecaster(nn.Module):
         # Fusion: fuse sky + flow + ts
         #self.fusion = GatedFusion(img_dim=self.sky_img_dim + self.flow_img_dim, ts_dim=ts_embed_dim, fused_dim=fused_dim)
 
-        self.fusion = ConcatFusion( img_dim=self.sky_img_dim + self.flow_img_dim, ts_dim=ts_embed_dim, fused_dim=fused_dim, dropout=dropout)
+        #self.fusion = ConcatFusion( img_dim=self.sky_img_dim + self.flow_img_dim, ts_dim=ts_embed_dim, fused_dim=fused_dim, dropout=dropout)
+        self.img_fusion = GatedFusion(img_dim=self.sky_img_dim, ts_dim= self.flow_img_dim, fused_dim=self.flow_img_dim)
+        self.fusion = GatedFusion(img_dim=self.flow_img_dim, ts_dim= ts_embed_dim, fused_dim=fused_dim)
 
         # Temporal modeling
         self.temporal = FusionTransformer(
@@ -216,13 +218,15 @@ class MultimodalForecaster(nn.Module):
         flow_feats = self.flow_pos_enc(flow_feats)
 
         # Concatenate both image embeddings
-        img_feats = torch.cat([sky_feats, flow_feats], dim=-1)
+        #img_feats = torch.cat([sky_feats, flow_feats], dim=-1)
 
         # Encode time-series
         ts_feats = self.ts_encoder(ts)
         ts_feats = self.ts_pos_enc(ts_feats)
 
         # Fuse modalities
+        img_feats = self.img_fusion(sky_feats, flow_feats)
+
         fused_feats = self.fusion(img_feats, ts_feats)
 
         # Temporal transformer
