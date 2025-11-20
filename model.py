@@ -135,10 +135,10 @@ class GatedFusion(nn.Module):
          # -------------------------------
         # L2 magnitude matching (new)
         # -------------------------------
-        norm_img = img_proj.norm(dim=-1, keepdim=True)
-        norm_ts  = ts_proj.norm(dim=-1, keepdim=True)
-        scale = (norm_ts + 1e-6) / (norm_img + 1e-6)
-        img_proj = img_proj * scale.detach()  
+        #norm_img = img_proj.norm(dim=-1, keepdim=True)
+        #norm_ts  = ts_proj.norm(dim=-1, keepdim=True)
+        #scale = (norm_ts + 1e-6) / (norm_img + 1e-6)
+        #img_proj = img_proj * scale.detach()  
 
         if random.random() < 0.2:
             print(f"img_feats norm: {img_proj.norm(dim=-1).mean().item():.3f}, "
