@@ -198,7 +198,7 @@ class MultimodalForecaster(nn.Module):
         num_layers: int = 2,
         nhead: int = 4,
         dim_feedforward: int = 512,
-        dropout: float = 0.2,
+        dropout: float = 0.3,
         horizon: int = 25,
         target_dim: int = 3,
     ):
@@ -219,7 +219,7 @@ class MultimodalForecaster(nn.Module):
         self.ts_pos_enc = PositionalEncoding(ts_embed_dim)
 
         # Fusion: fuse sky + flow + ts
-        self.fusion = GatedFusion(img_dim=self.sky_img_dim + self.flow_img_dim, ts_dim=ts_embed_dim, fused_dim=fused_dim)
+        self.fusion = GatedFusion(img_dim=self.sky_img_dim + self.flow_img_dim, ts_dim=ts_embed_dim, fused_dim=fused_dim, dropout=dropout)
 
         # Temporal modeling
         self.temporal = FusionTransformer(
