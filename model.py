@@ -7,27 +7,74 @@ import random
 # IMAGE ENCODER
 # =========================================
 class ImageEncoder(nn.Module):
-    def __init__(self, model_name: str = 'vit_base_patch16_224', pretrained: bool = True, freeze: bool = True):
+    def __init__(self, model_name: str = 'vit_base_patch16_224', pretrained: bool = True,
+                 freeze: bool = True, unfreeze_last: int = 0):
+        """
+        Args:
+            model_name: timm model name
+            pretrained: load pretrained weights
+            freeze: freeze backbone parameters
+            unfreeze_last: number of last layers/stages to unfreeze
+        """
         super().__init__()
         self.backbone = timm.create_model(model_name, pretrained=pretrained, num_classes=0, global_pool='avg')
         self.out_dim = self.backbone.num_features
+
         if freeze:
             for p in self.backbone.parameters():
                 p.requires_grad = False
 
+            if unfreeze_last > 0:
+                self._unfreeze_last_layers(unfreeze_last)
+
+    def _unfreeze_last_layers(self, n: int):
+        backbone_type = self.backbone.__class__.__name__.lower()
+
+        if 'swin' in backbone_type:
+            # Swin: layers[0..3] are the 4 stages
+            layers = [self.backbone.layers[0], self.backbone.layers[1],
+                      self.backbone.layers[2], self.backbone.layers[3]]
+            for layer in layers[-n:]:
+                for p in layer.parameters():
+                    p.requires_grad = True
+            # Optionally unfreeze final norm
+            for p in self.backbone.norm.parameters():
+                p.requires_grad = True
+
+        elif 'resnet' in backbone_type:
+            # ResNet: layer1..layer4
+            layers = [self.backbone.layer1, self.backbone.layer2,
+                      self.backbone.layer3, self.backbone.layer4]
+            for layer in layers[-n:]:
+                for p in layer.parameters():
+                    p.requires_grad = True
+
+        else:
+            print(f"Unfreeze last layers: please customize for backbone {backbone_type}")
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # x: (B, C, H, W)
         return self.backbone(x)
-
-
+    
 # =========================================
 # TIME SERIES ENCODER
 # =========================================
 class TS_Encoder(nn.Module):
-    def __init__(self, ts_feat_dim: int, ts_embed_dim: int = 128, dropout: float = 0.1):
+    def __init__(self, ts_feat_dim: int, ts_embed_dim: int = 128, hidden_dim: int = 128, dropout: float = 0.1):
+        """
+        Args:
+            ts_feat_dim: number of input TS features per time step
+            ts_embed_dim: output embedding dimension
+            hidden_dim: hidden dimension of intermediate layer
+            dropout: dropout rate
+        """
         super().__init__()
         self.proj = nn.Sequential(
-            nn.Linear(ts_feat_dim, ts_embed_dim),
+            nn.Linear(ts_feat_dim, hidden_dim),
+            nn.GELU(),
+            nn.LayerNorm(hidden_dim),
+            nn.Dropout(dropout),
+
+            nn.Linear(hidden_dim, ts_embed_dim),
             nn.GELU(),
             nn.LayerNorm(ts_embed_dim),
             nn.Dropout(dropout),
@@ -35,7 +82,12 @@ class TS_Encoder(nn.Module):
         self.out_dim = ts_embed_dim
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # x: (B, T, F)
+        """
+        Args:
+            x: (B, T, F) - batch, time steps, features
+        Returns:
+            (B, T, ts_embed_dim)
+        """
         return self.proj(x)
 
 
