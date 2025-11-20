@@ -68,7 +68,7 @@ class GatedFusion(nn.Module):
         self.img_proj = nn.Linear(img_dim, fused_dim)
         self.ts_proj = nn.Linear(ts_dim, fused_dim)
         self.gate = nn.Sequential(
-            nn.Linear(img_dim + ts_dim, fused_dim),
+            nn.Linear(fused_dim*2, fused_dim),
             nn.Sigmoid()
         )
         self.dropout = nn.Dropout(dropout)
@@ -76,31 +76,14 @@ class GatedFusion(nn.Module):
     def forward(self, img_feats, ts_feats):
         # Align lengths (use last T_img TS steps)
         ts_last = ts_feats[:, -img_feats.shape[1]:, :]
-        gate = self.gate(torch.cat([img_feats, ts_last], dim=-1))
+        
         img_proj = self.img_proj(img_feats)
         ts_proj = self.ts_proj(ts_last)
+
+        gate = self.gate(torch.cat([img_proj, ts_proj], dim=-1))
+
         fused = gate * img_proj + (1 - gate) * ts_proj
         return self.dropout(fused)
-
-
-
-class ConcatFusion(nn.Module):
-    def __init__(self, img_dim, ts_dim, fused_dim, dropout=0.1):
-        super().__init__()
-        self.proj = nn.Sequential(
-            nn.Linear(img_dim + ts_dim, fused_dim),
-            nn.GELU(),
-            nn.LayerNorm(fused_dim),
-            nn.Dropout(dropout)
-        )
-
-    def forward(self, img_feats, ts_feats):
-        # Align TS length to image length
-        ts_last = ts_feats[:, -img_feats.shape[1]:, :]
-
-        fused = torch.cat([img_feats, ts_last], dim=-1)
-        return self.proj(fused)
-
 
 
 # =========================================
@@ -164,11 +147,7 @@ class MultimodalForecaster(nn.Module):
         self.ts_pos_enc = PositionalEncoding(ts_embed_dim)
 
         # Fusion: fuse sky + flow + ts
-        #self.fusion = GatedFusion(img_dim=self.sky_img_dim + self.flow_img_dim, ts_dim=ts_embed_dim, fused_dim=fused_dim)
-
-        #self.fusion = ConcatFusion( img_dim=self.sky_img_dim + self.flow_img_dim, ts_dim=ts_embed_dim, fused_dim=fused_dim, dropout=dropout)
-        self.img_fusion = GatedFusion(img_dim=self.sky_img_dim, ts_dim= self.flow_img_dim, fused_dim=self.flow_img_dim)
-        self.fusion = GatedFusion(img_dim=self.flow_img_dim, ts_dim= ts_embed_dim, fused_dim=fused_dim)
+        self.fusion = GatedFusion(img_dim=self.sky_img_dim + self.flow_img_dim, ts_dim=ts_embed_dim, fused_dim=fused_dim)
 
         # Temporal modeling
         self.temporal = FusionTransformer(
@@ -218,15 +197,16 @@ class MultimodalForecaster(nn.Module):
         flow_feats = self.flow_pos_enc(flow_feats)
 
         # Concatenate both image embeddings
-        #img_feats = torch.cat([sky_feats, flow_feats], dim=-1)
+        img_feats = torch.cat([sky_feats, flow_feats], dim=-1)
 
         # Encode time-series
         ts_feats = self.ts_encoder(ts)
         ts_feats = self.ts_pos_enc(ts_feats)
 
-        # Fuse modalities
-        img_feats = self.img_fusion(sky_feats, flow_feats)
+        print("img_feats norm:", img_feats.norm(dim=-1).mean().item())
+        print("ts_feats  norm:", ts_feats.norm(dim=-1).mean().item())
 
+        # Fuse modalities
         fused_feats = self.fusion(img_feats, ts_feats)
 
         # Temporal transformer
