@@ -8,7 +8,7 @@ import random
 # =========================================
 class ImageEncoder(nn.Module):
     def __init__(self, model_name: str = 'vit_base_patch16_224', pretrained: bool = True,
-                 freeze: bool = True, unfreeze_last: int = 0):
+                 freeze: bool = True, unfreeze_last: int = 2):
         """
         Args:
             model_name: timm model name
@@ -117,8 +117,16 @@ class PositionalEncoding(nn.Module):
 class GatedFusion(nn.Module):
     def __init__(self, img_dim, ts_dim, fused_dim, dropout: float = 0.1):
         super().__init__()
-        self.img_proj = nn.Linear(img_dim, fused_dim)
-        self.ts_proj = nn.Linear(ts_dim, fused_dim)
+        self.img_proj = nn.Sequential(
+            nn.Linear(img_dim, fused_dim),
+            nn.LayerNorm(fused_dim)
+        )
+
+        self.ts_proj = nn.Sequential(
+            nn.Linear(ts_dim, fused_dim),
+            nn.LayerNorm(fused_dim)
+        )
+
         self.gate = nn.Sequential(
             nn.Linear(fused_dim*2, fused_dim),
             nn.Sigmoid()
