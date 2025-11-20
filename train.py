@@ -138,7 +138,7 @@ if __name__ == "__main__":
     val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=1, pin_memory=True)
 
     # --- Model setup ---
-    sky_encoder = ImageEncoder(model_name="swin_tiny_patch4_window7_224", pretrained=True, freeze=True)
+    sky_encoder = ImageEncoder(model_name="resnet18", pretrained=True, freeze=True)
     flow_encoder = ImageEncoder(model_name="resnet18", pretrained=True, freeze=True)
     model = MultimodalForecaster(
         sky_encoder=sky_encoder,
