@@ -148,7 +148,7 @@ class GatedFusion(nn.Module):
         #scale = (norm_ts + 1e-6) / (norm_img + 1e-6)
         #img_proj = img_proj * scale.detach()  
 
-        if random.random() < 0.2:
+        if random.random() < 0.07:
             print(f"img_feats norm: {img_proj.norm(dim=-1).mean().item():.3f}, "
               f"ts_feats norm: {ts_proj.norm(dim=-1).mean().item():.3f}")
             
