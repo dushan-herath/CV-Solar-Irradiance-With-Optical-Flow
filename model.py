@@ -80,6 +80,15 @@ class GatedFusion(nn.Module):
         img_proj = self.img_proj(img_feats)
         ts_proj = self.ts_proj(ts_last)
 
+         # -------------------------------
+        # L2 magnitude matching (new)
+        # -------------------------------
+        norm_img = img_proj.norm(dim=-1, keepdim=True)
+        norm_ts  = ts_proj.norm(dim=-1, keepdim=True)
+        scale = (norm_ts + 1e-6) / (norm_img + 1e-6)
+        img_proj = img_proj * scale.detach()  
+
+
         gate = self.gate(torch.cat([img_proj, ts_proj], dim=-1))
 
         fused = gate * img_proj + (1 - gate) * ts_proj
@@ -203,8 +212,9 @@ class MultimodalForecaster(nn.Module):
         ts_feats = self.ts_encoder(ts)
         ts_feats = self.ts_pos_enc(ts_feats)
 
-        print("img_feats norm:", img_feats.norm(dim=-1).mean().item())
-        print("ts_feats  norm:", ts_feats.norm(dim=-1).mean().item())
+        if random.random() < 0.2:
+            print("img_feats norm:", img_feats.norm(dim=-1).mean().item())
+            print("ts_feats  norm:", ts_feats.norm(dim=-1).mean().item())
 
         # Fuse modalities
         fused_feats = self.fusion(img_feats, ts_feats)
