@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
     # --- Model setup ---
     sky_encoder = ImageEncoder(model_name="swin_tiny_patch4_window7_224", pretrained=False, freeze=True)
-    flow_encoder = ImageEncoder(model_name="resnet18", pretrained=False, freeze=True)
+    flow_encoder = ImageEncoder(model_name="swin_tiny_patch4_window7_224", pretrained=False, freeze=True)
 
     model = MultimodalForecaster(
         sky_encoder=sky_encoder,
