@@ -148,7 +148,7 @@ class GatedFusion(nn.Module):
         #scale = (norm_ts + 1e-6) / (norm_img + 1e-6)
         #img_proj = img_proj * scale.detach()  
 
-        if random.random() < 0.07:
+        if random.random() < 0.005:
             print(f"img_feats norm: {img_proj.norm(dim=-1).mean().item():.3f}, "
               f"ts_feats norm: {ts_proj.norm(dim=-1).mean().item():.3f}")
             
@@ -198,7 +198,7 @@ class MultimodalForecaster(nn.Module):
         num_layers: int = 2,
         nhead: int = 4,
         dim_feedforward: int = 512,
-        dropout: float = 0.3,
+        dropout: float = 0.2,
         horizon: int = 25,
         target_dim: int = 3,
     ):
