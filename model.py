@@ -8,7 +8,7 @@ import random
 # =========================================
 class ImageEncoder(nn.Module):
     def __init__(self, model_name: str = 'vit_base_patch16_224', pretrained: bool = True,
-                 freeze: bool = True, unfreeze_last: int = 2):
+                 freeze: bool = True, unfreeze_last: int = 1):
         """
         Args:
             model_name: timm model name
