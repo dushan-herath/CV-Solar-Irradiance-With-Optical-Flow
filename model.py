@@ -124,6 +124,7 @@ class PositionalEncoding(nn.Module):
 # =========================================
 # FUSION MODULE
 # =========================================
+""""
 class GatedFusion(nn.Module):
     def __init__(self, img_dim, ts_dim, fused_dim, dropout: float = 0.1):
         super().__init__()
@@ -166,6 +167,31 @@ class GatedFusion(nn.Module):
 
         fused = gate * img_proj + (1 - gate) * ts_proj
         return self.dropout(fused)
+
+"""
+
+class GatedFusion(nn.Module):
+    def __init__(self, img_dim, ts_dim, fused_dim, dropout=0.1):
+        super().__init__()
+        
+        self.img_proj = nn.Linear(img_dim, fused_dim)
+        self.ts_proj  = nn.Linear(ts_dim, fused_dim)
+        
+        self.fuse = nn.Sequential(
+            nn.Linear(fused_dim*2, fused_dim),
+            nn.GELU(),
+            nn.LayerNorm(fused_dim),
+            nn.Dropout(dropout)
+        )
+
+    def forward(self, img, ts):
+        # Align lengths: take last T_img TS steps
+        ts_last = ts[:, -img.shape[1]:, :]  # ts_last: [B, T_img, ts_dim]
+        img_f = self.img_proj(img)
+        ts_f  = self.ts_proj(ts_last)
+
+        fused = self.fuse(torch.cat([img_f, ts_f], dim=-1))
+        return fused
 
 
 # =========================================
