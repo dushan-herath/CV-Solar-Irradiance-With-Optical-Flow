@@ -8,7 +8,7 @@ import random
 # =========================================
 class ImageEncoder(nn.Module):
     def __init__(self, model_name: str = 'vit_base_patch16_224', pretrained: bool = True,
-                 freeze: bool = True, unfreeze_last: int = 1):
+                 freeze: bool = True, unfreeze_last: int = 0):
         """
         Args:
             model_name: timm model name
@@ -30,27 +30,37 @@ class ImageEncoder(nn.Module):
     def _unfreeze_last_layers(self, n: int):
         backbone_type = self.backbone.__class__.__name__.lower()
 
-        if 'swin' in backbone_type:
-            # Swin: layers[0..3] are the 4 stages
+        if "swin" in backbone_type:
             layers = [self.backbone.layers[0], self.backbone.layers[1],
-                      self.backbone.layers[2], self.backbone.layers[3]]
+                    self.backbone.layers[2], self.backbone.layers[3]]
             for layer in layers[-n:]:
                 for p in layer.parameters():
                     p.requires_grad = True
-            # Optionally unfreeze final norm
             for p in self.backbone.norm.parameters():
                 p.requires_grad = True
 
-        elif 'resnet' in backbone_type:
-            # ResNet: layer1..layer4
+        elif "resnet" in backbone_type:
             layers = [self.backbone.layer1, self.backbone.layer2,
-                      self.backbone.layer3, self.backbone.layer4]
+                    self.backbone.layer3, self.backbone.layer4]
             for layer in layers[-n:]:
                 for p in layer.parameters():
+                    p.requires_grad = True
+
+        elif "convnext" in backbone_type:  
+            # ConvNeXtV1/V2 have 4 stages
+            stages = self.backbone.stages
+            for stage in stages[-n:]:
+                for p in stage.parameters():
+                    p.requires_grad = True
+
+            # Also unfreeze final norm/head if present
+            if hasattr(self.backbone, "norm"):
+                for p in self.backbone.norm.parameters():
                     p.requires_grad = True
 
         else:
             print(f"Unfreeze last layers: please customize for backbone {backbone_type}")
+
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.backbone(x)
@@ -302,9 +312,9 @@ class MultimodalForecaster(nn.Module):
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # Image encoders
-    sky_enc = ImageEncoder(model_name='vit_small_patch16_224', pretrained=True, freeze=True)
-    flow_enc = ImageEncoder(model_name= 'resnet18', pretrained=True, freeze=True)
+    # Image encoders using ConvNeXtV2-Tiny
+    sky_enc = ImageEncoder(model_name='convnextv2_tiny', pretrained=True, freeze=True)
+    flow_enc = ImageEncoder(model_name='resnet18', pretrained=True, freeze=True)
 
     # Model
     model = MultimodalForecaster(
@@ -327,4 +337,4 @@ if __name__ == "__main__":
     ts = torch.randn(B, T_ts, 5).to(device)
 
     preds = model(sky_imgs, flow_imgs, ts)
-    print("preds.shape:", preds.shape)  # (B, horizon, target_dim)
+    print("preds.shape:", preds.shape)
