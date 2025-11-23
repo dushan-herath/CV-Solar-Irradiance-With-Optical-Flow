@@ -145,8 +145,8 @@ if __name__ == "__main__":
     val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=2, pin_memory=True)
 
     # --- Model setup ---
-    sky_encoder = ImageEncoder(model_name="vit_large_patch16_224_mae", pretrained=True, freeze=True, unfreeze_last=2)
-    flow_encoder = ImageEncoder(model_name="vit_large_patch16_224_mae", pretrained=True, freeze=True, unfreeze_last=2)
+    sky_encoder = ImageEncoder(model_name="vit_large_patch16_224_in21k", pretrained=True, freeze=True, unfreeze_last=2)
+    flow_encoder = ImageEncoder(model_name="vit_large_patch16_224_in21k", pretrained=True, freeze=True, unfreeze_last=2)
     model = MultimodalForecaster(
         sky_encoder=sky_encoder,
         flow_encoder=flow_encoder,
