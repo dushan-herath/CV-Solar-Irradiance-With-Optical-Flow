@@ -13,7 +13,7 @@ from model import ImageEncoder, MultimodalForecaster
 
 # ------------------ Training + Validation ------------------
 
-def train_one_epoch(model, loader, optimizer, criterion, device):
+def train_one_epoch(model, loader, optimizer, criterion, device, scaler):
     model.train()
     total_loss = 0.0
     loop = tqdm(loader, total=len(loader), desc="Training", leave=False)
@@ -25,15 +25,22 @@ def train_one_epoch(model, loader, optimizer, criterion, device):
         targets = targets.to(device)
 
         optimizer.zero_grad()
-        preds = model(sky_seq, flow_seq, ts_seq)
-        loss = criterion(preds, targets)
-        loss.backward()
-        optimizer.step()
+
+        # Mixed Precision Forward Pass
+        with torch.cuda.amp.autocast():
+            preds = model(sky_seq, flow_seq, ts_seq)
+            loss = criterion(preds, targets)
+
+        # Backward with GradScaler
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
 
         total_loss += loss.item()
         loop.set_postfix(loss=loss.item())
 
     return total_loss / len(loader)
+
 
 
 def validate_one_epoch(model, loader, criterion, device):
@@ -98,7 +105,7 @@ if __name__ == "__main__":
     CSV_PATH = "processed_dataset_cropped_full.csv"
     BATCH_SIZE = 64
     NUM_EPOCHS = 25
-    LR = 1e-5
+    #LR = 1e-5
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     IMG_SEQ_LEN = 5
     TS_SEQ_LEN = 30
@@ -163,7 +170,19 @@ if __name__ == "__main__":
 
     # --- Training setup ---
     criterion = nn.MSELoss()
-    optimizer = optim.AdamW(model.parameters(), lr=LR, weight_decay=1e-4)
+    
+    #optimizer = optim.AdamW(model.parameters(), lr=LR, weight_decay=1e-4)
+    # Layer-wise learning rates
+    optimizer = torch.optim.AdamW([
+        {"params": model.sky_encoder.parameters(), "lr": 1e-5},      # pretrained sky encoder
+        {"params": model.flow_encoder.parameters(), "lr": 1e-5},     # pretrained flow encoder
+        {"params": model.ts_encoder.parameters(), "lr": 1e-4},       # TS encoder
+        {"params": model.fusion.parameters(), "lr": 1e-4},           # Fusion layers
+        {"params": model.temporal.parameters(), "lr": 1e-4},         # Transformer
+        {"params": model.head.parameters(), "lr": 1e-4},             # Output head
+    ], weight_decay=1e-4)
+
+    scaler = torch.cuda.amp.GradScaler()
 
     # --- Resume from checkpoint if exists ---
     start_epoch = 0
@@ -179,7 +198,7 @@ if __name__ == "__main__":
     for epoch in range(start_epoch, NUM_EPOCHS):
         print(f"\nEpoch {epoch + 1}/{NUM_EPOCHS}")
 
-        train_loss = train_one_epoch(model, train_loader, optimizer, criterion, DEVICE)
+        train_loss = train_one_epoch(model, train_loader, optimizer, criterion, DEVICE, scaler)
         val_loss = validate_one_epoch(model, val_loader, criterion, DEVICE)
 
         train_losses.append(train_loss)
