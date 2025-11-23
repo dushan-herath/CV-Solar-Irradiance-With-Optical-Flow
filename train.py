@@ -98,7 +98,7 @@ if __name__ == "__main__":
     CSV_PATH = "processed_dataset_cropped_full.csv"
     BATCH_SIZE = 64
     NUM_EPOCHS = 25
-    LR = 1e-4
+    LR = 1e-5
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     IMG_SEQ_LEN = 5
     TS_SEQ_LEN = 30
@@ -138,8 +138,8 @@ if __name__ == "__main__":
     val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=2, pin_memory=True)
 
     # --- Model setup ---
-    sky_encoder = ImageEncoder(model_name="convnextv2_tiny", pretrained=True, freeze=True)
-    flow_encoder = ImageEncoder(model_name="convnextv2_tiny", pretrained=True, freeze=True)
+    sky_encoder = ImageEncoder(model_name="resnet18", pretrained=True, freeze=True)
+    flow_encoder = ImageEncoder(model_name="resnet18", pretrained=True, freeze=True)
     model = MultimodalForecaster(
         sky_encoder=sky_encoder,
         flow_encoder=flow_encoder,
@@ -163,7 +163,7 @@ if __name__ == "__main__":
 
     # --- Training setup ---
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=1e-4)
+    optimizer = optim.AdamW(model.parameters(), lr=LR, weight_decay=1e-4)
 
     # --- Resume from checkpoint if exists ---
     start_epoch = 0
