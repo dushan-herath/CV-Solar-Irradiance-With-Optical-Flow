@@ -3,6 +3,8 @@ import torch
 from torch import nn
 import timm
 import random
+
+
 # =========================================
 # IMAGE ENCODER
 # =========================================
@@ -64,7 +66,9 @@ class ImageEncoder(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.backbone(x)
-    
+
+
+
 # =========================================
 # TIME SERIES ENCODER
 # =========================================

@@ -19,15 +19,15 @@ def train_one_epoch(model, loader, optimizer, criterion, device, scaler):
     loop = tqdm(loader, total=len(loader), desc="Training", leave=False)
 
     for sky_seq, flow_seq, ts_seq, targets, *_ in loop:
-        sky_seq = sky_seq.to(device, non_blocking=True)
-        flow_seq = flow_seq.to(device, non_blocking=True)
-        ts_seq = ts_seq.to(device, non_blocking=True)
-        targets = targets.to(device, non_blocking=True)
+        sky_seq = sky_seq.to(device)
+        flow_seq = flow_seq.to(device)
+        ts_seq = ts_seq.to(device)
+        targets = targets.to(device)
 
         optimizer.zero_grad()
 
         # Mixed Precision Forward Pass
-        with torch.amp.autocast(device_type=device.type):
+        with torch.cuda.amp.autocast():
             preds = model(sky_seq, flow_seq, ts_seq)
             loss = criterion(preds, targets)
 
@@ -42,21 +42,20 @@ def train_one_epoch(model, loader, optimizer, criterion, device, scaler):
     return total_loss / len(loader)
 
 
+
 def validate_one_epoch(model, loader, criterion, device):
     model.eval()
     total_loss = 0.0
     with torch.no_grad():
         loop = tqdm(loader, total=len(loader), desc="Validation", leave=False)
         for sky_seq, flow_seq, ts_seq, targets, *_ in loop:
-            sky_seq = sky_seq.to(device, non_blocking=True)
-            flow_seq = flow_seq.to(device, non_blocking=True)
-            ts_seq = ts_seq.to(device, non_blocking=True)
-            targets = targets.to(device, non_blocking=True)
+            sky_seq = sky_seq.to(device)
+            flow_seq = flow_seq.to(device)
+            ts_seq = ts_seq.to(device)
+            targets = targets.to(device)
 
-            with torch.amp.autocast(device_type=device.type):
-                preds = model(sky_seq, flow_seq, ts_seq)
-                loss = criterion(preds, targets)
-
+            preds = model(sky_seq, flow_seq, ts_seq)
+            loss = criterion(preds, targets)
             total_loss += loss.item()
 
     return total_loss / len(loader)
@@ -106,6 +105,7 @@ if __name__ == "__main__":
     CSV_PATH = "processed_dataset_cropped_full.csv"
     BATCH_SIZE = 4
     NUM_EPOCHS = 25
+    #LR = 1e-5
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     IMG_SEQ_LEN = 5
     TS_SEQ_LEN = 30
@@ -121,9 +121,6 @@ if __name__ == "__main__":
         img_seq_len=IMG_SEQ_LEN,
         ts_seq_len=TS_SEQ_LEN,
         horizon=HORIZON,
-        preload_to_gpu=True,
-        device=DEVICE,
-        half_precision=True,
     )
     val_ds = IrradianceForecastDataset(
         csv_path=CSV_PATH,
@@ -132,9 +129,6 @@ if __name__ == "__main__":
         ts_seq_len=TS_SEQ_LEN,
         horizon=HORIZON,
         normalization_stats=train_ds.normalization_stats,
-        preload_to_gpu=True,
-        device=DEVICE,
-        half_precision=True,
     )
 
     # Save normalization stats
@@ -151,8 +145,11 @@ if __name__ == "__main__":
     val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=2, pin_memory=True)
 
     # --- Model setup ---
-    sky_encoder = ImageEncoder(model_name="resnet50", pretrained=True, freeze=True, unfreeze_last=0)
-    flow_encoder = ImageEncoder(model_name="resnet50", pretrained=True, freeze=True, unfreeze_last=0)
+    sky_encoder = ImageEncoder(model_name="efficientnetv2_s", pretrained=False, freeze=False, unfreeze_last=2)
+    flow_encoder = ImageEncoder(model_name="resnet18", pretrained=True, freeze=True, unfreeze_last=2)
+
+
+
     model = MultimodalForecaster(
         sky_encoder=sky_encoder,
         flow_encoder=flow_encoder,
@@ -163,6 +160,7 @@ if __name__ == "__main__":
         num_layers=2,
     ).to(DEVICE)
 
+
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
@@ -172,19 +170,23 @@ if __name__ == "__main__":
         f"Trainable: {trainable_params/1e6:.2f}M"
     )
 
+
     # --- Training setup ---
     criterion = nn.MSELoss()
+    
+    #optimizer = optim.AdamW(model.parameters(), lr=LR, weight_decay=1e-4)
+    # Layer-wise learning rates
     optimizer = torch.optim.AdamW([
-        {"params": model.sky_encoder.parameters(), "lr": 1e-5},
-        {"params": model.flow_encoder.parameters(), "lr": 1e-5},
-        {"params": model.ts_encoder.parameters(), "lr": 1e-4},
-        {"params": model.fusion.parameters(), "lr": 1e-4},
-        {"params": model.temporal.parameters(), "lr": 1e-4},
-        {"params": model.head.parameters(), "lr": 1e-4},
+        {"params": model.sky_encoder.parameters(), "lr": 1e-5},      # pretrained sky encoder
+        {"params": model.flow_encoder.parameters(), "lr": 1e-5},     # pretrained flow encoder
+        {"params": model.ts_encoder.parameters(), "lr": 1e-4},       # TS encoder
+        {"params": model.fusion.parameters(), "lr": 1e-4},           # Fusion layers
+        {"params": model.temporal.parameters(), "lr": 1e-4},         # Transformer
+        {"params": model.head.parameters(), "lr": 1e-4},             # Output head
     ], weight_decay=1e-4)
 
-    # --- AMP GradScaler (updated) ---
     scaler = torch.amp.GradScaler(device=DEVICE.type if DEVICE.type == "cuda" else "cpu")
+
 
     # --- Resume from checkpoint if exists ---
     start_epoch = 0

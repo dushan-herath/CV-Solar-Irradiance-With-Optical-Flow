@@ -82,16 +82,13 @@ if __name__ == "__main__":
         img_seq_len=IMG_SEQ_LEN,
         ts_seq_len=TS_SEQ_LEN,
         horizon=MAX_HORIZON,
-        normalization_stats=normalization_stats,
-        preload_to_gpu=True,
-        device=DEVICE,
-        half_precision=True,
+        normalization_stats=normalization_stats
     )
     val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=1, pin_memory=True)
     print(f"Dataset initialized (VAL): {len(val_ds)} samples, horizon={MAX_HORIZON}")
 
     # --- Model setup ---
-    sky_encoder = ImageEncoder(model_name="resnet18", pretrained=False, freeze=True)
+    sky_encoder = ImageEncoder(model_name="efficientnetv2_s", pretrained=False, freeze=True)
     flow_encoder = ImageEncoder(model_name="resnet18", pretrained=False, freeze=True)
 
     model = MultimodalForecaster(
